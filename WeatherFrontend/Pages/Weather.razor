@@ -1,0 +1,648 @@
+﻿@page "/weather"
+@* @attribute [Authorize] *@
+@using System.Text.Json
+@using System.Net;
+@using System.Net.Http.Headers
+@using WeatherFrontend.Models
+@using static WeatherFrontend.Models.ForecastModel
+@inject NavigationManager NavigationManager
+@inject HttpClient http
+@inject UserData Data
+@* @inject IJSRuntime JS *@
+
+
+@* <MudAppBar style="background-color:#9CCC65">
+    <MudSpacer/>
+    <MudImage src="Images/user.png" width="48" height="48" onclick=""></MudImage>
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Inherit"
+               StartIcon="@Icons.Material.Filled.Logout"
+               Style="position: fixed; top: 20px; right: 30px; z-index: 1000;"
+               OnClick="Logout">
+        Log Out
+    </MudButton>
+</MudAppBar> *@
+
+<MudAppBar style="background-color:#9CCC65">
+    <MudText Typo="Typo.h6">My App</MudText>
+    <MudSpacer />
+
+    <MudImage src="Images/user.png"
+              width="48"
+              height="48"
+              Class="rounded-circle me-2"
+              @onclick="ToggleProfile" />
+</MudAppBar>
+
+@if (showProfile)
+{
+    <MudCard Class="ma-4 pa-4" Style="position: absolute; top: 70px; right: 20px; z-index: 1000; min-width: 220px;">
+    <MudList T="object" Dense="true">
+        <MudListItem>
+            <MudListItemText>
+                <MudText Typo="Typo.subtitle1">Email:</MudText>
+                <MudText Typo="Typo.body2">@Data.Email</MudText>
+            </MudListItemText>
+        </MudListItem>
+
+        <MudListItem Class="mt-2">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.Logout"
+                       FullWidth="true"
+                       OnClick="Logout">
+                Log Out
+            </MudButton>
+        </MudListItem>
+    </MudList>
+</MudCard>
+
+}
+
+
+<MudContainer Class=" py-8 px-4" Style="border-radius:20px;background-color:#F1F8E9; width:1100px;min-height:100vh;">
+    <MudText Typo="Typo.h3" Align="Align.Center" Class="mb-6">🌤️ Weather App</MudText>
+
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem md="6" class="main-top">
+            <MudPaper Elevation="0">
+                <MudAutocomplete T="string"
+                                 @bind-Value="city"
+                                 Variant="Variant.Outlined"
+                                 Style="width:450px; height:45px;"
+                                 Placeholder="Enter city name"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.LocationCity"
+                                 SearchFunc="SearchCities"
+                                 ToStringFunc="@(s => s)"
+                                 MinCharacters="2"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true" />
+
+            </MudPaper>
+        </MudItem>
+
+        <MudItem md="6">
+            <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search" OnClick="GetWeather" Style="background-color:#C5E1A5">
+                Get Weather
+            </MudButton>
+
+            @* <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search" OnClick="GetForecast" Style="background-color:#C5E1A5">
+                Get Forecast
+            </MudButton> *@
+        
+            <MudButton Variant="Variant.Filled" OnClick="ToggleFavourites" Style="background-color:#C5E1A5">
+                My Favourites
+            </MudButton>
+
+            <MudButton Style="background-color:#C5E1A5" Onclick="SendEmail" Variant="Variant.Filled">
+                Send Report to Mail
+            </MudButton>
+
+        </MudItem>
+
+        @if (showConfirmationMessage)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Filled" Class="mt-3">
+                ✅ Report Sent successfully 
+            </MudAlert>
+        }
+    </MudGrid>
+
+
+    <MudGrid Class="mt-8 px-6" Gutter="true" >
+    <!-- Left Weather Card -->
+        @if (fetched != null && fetched.weather != null)
+        {
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="3" Class="pa-6" Style="border-radius: 20px; background-color: #C5E1A5;">
+                    <MudGrid Gutter="GutterSize.Small" Class="mt-2">
+                        <MudItem xs="6" >
+                            <MudText Typo="Typo.h6" Class="ms-8">Your city</MudText>
+                            <MudText Typo="Typo.h4" Class="ms-6">@city</MudText>
+                        </MudItem>
+                        <MudItem xs="6" Class="d-flex justify-end" >
+                            <MudIconButton Icon="@(isFavourite 
+            ? Icons.Material.Filled.Favorite 
+            : Icons.Material.Outlined.FavoriteBorder)" Color="Color.Secondary" aria-label="add to favorite" Size="Size.Large" style="padding-right:30px" @onclick="AddFavourites" />
+                        </MudItem>
+                    </MudGrid>
+                    
+                    <MudDivider Class="my-4" />
+
+                    <MudText Typo="Typo.subtitle1" Class="ms-3">@DateTime.Now.ToString("hh:mm tt, ddd, MMM dd, yyyy")</MudText>
+
+                    <div class="d-flex align-center my-4" >
+                        <img src="@GetWeatherImage(fetched.weather[0].description)" alt="Weather Icon" width="48" height="48" />
+                        <MudText Typo="Typo.h3" Class="ms-3">@($"{fetched.main.temp} °C")</MudText>
+                    </div>
+
+                    <MudText Typo="Typo.h6" Class="mb-2 ms-3">@fetched.weather[0].description</MudText>
+
+                    <MudGrid Gutter="GutterSize.Small" Class="mt-2">
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle1" Class="ms-3">Humidity</MudText>
+                            <MudText Typo="Typo.h6" Class="ms-3">@fetched.main.humidity%</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.subtitle1">Wind speed</MudText>
+                            <MudText Typo="Typo.h6">@fetched.wind.speed km/h</MudText>
+                        </MudItem>
+                    </MudGrid>
+
+
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="3" Class="pa-6" Style="border-radius: 12px; background-color: #C5E1A5;">
+                    <MudText Typo="Typo.h5" Class="mb-3">5 Day Weather Forecast</MudText>
+                    <MudTable Items="dailyForecasts" Style="background: #fafafa;border-radius: 12px;">
+                        <HeaderContent>
+                            <MudTh><strong>Date</strong></MudTh>
+                            <MudTh><strong>Temperature (°C)</strong> </MudTh>
+                            <MudTh><strong>Description</strong></MudTh>
+                            <MudTh><strong>Icon</strong></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Date & Time">@DateTime.Parse(context.dt_txt).ToString("dddd, dd MMM")</MudTd>
+                            <MudTd DataLabel="Temperature">@context.main.temp</MudTd>
+                            <MudTd DataLabel="Description">@context.weather[0].description</MudTd>
+                            <MudTd> <img src="@GetWeatherImage(context.weather[0].description)" alt="Weather Icon" width="34" height="34" /></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+
+            </MudItem>
+        }
+
+       
+
+
+
+
+        <!-- Right Favourites Table -->
+        @if (showFavourites)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="3" Class="pa-6" Style="border-radius: 12px; background-color: #C5E1A5;">
+                    <MudText Typo="Typo.h5" Class="mb-3">🌍 My Favourite Cities</MudText>
+                    <MudTable Items="favList" Style="background: #fafafa;border-radius: 12px;">
+                        <HeaderContent>
+                            <MudTh><strong>City</strong></MudTh>
+                            <MudTh><strong>Description</strong></MudTh>
+                            <MudTh><strong>Temp</strong></MudTh>
+                            <MudTh><strong>Humidity</strong></MudTh>
+                            <MudTh><strong>Sunrise</strong></MudTh>
+                            
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.City</MudTd>
+                            <MudTd>@context.Description</MudTd>
+                            <MudTd>@context.Temperature °C</MudTd>
+                            <MudTd>@context.Humidity%</MudTd>
+                            <MudTd>@context.Sunrise</MudTd>
+               
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
+        <MudText Typo="Typo.subtitle1" Align="Align.Center" Class="mt-2">Checking authentication...</MudText>
+        return;
+    }
+</MudContainer>
+
+
+@code {
+
+    [Inject]
+    public IJSRuntime JS { get; set; } = default!;
+
+    private string city = string.Empty;
+    //private WeatherData weatherData = new WeatherData();
+    private string errorMessage = string.Empty;
+    private List<WeatherData> weatherList = new List<WeatherData>();
+    private bool showFavourites = false;
+    private List<WeatherData> favList = new List<WeatherData>();
+    private List<string> favourites = new();
+    private WeatherResponse fetched;
+
+    private bool isLoading = true;
+
+    private List<ForecastItem> forecasts;
+    private List<ForecastItem> dailyForecasts;
+
+    private bool _hasRedirected = false;
+
+    private bool showProfile = false;
+
+    private bool showConfirmationMessage = false;
+
+    private bool isFavourite = false;
+
+
+    private void ToggleProfile()
+    {
+        showProfile = !showProfile;
+    }
+
+    
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var jwt = await JS.InvokeAsync<string>("localStorage.getItem", "jwt");
+
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            NavigationManager.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+        try
+        {
+            var response = await http.GetAsync("https://localhost:7155/api/auth/validate");
+
+            if (!response.IsSuccessStatusCode)
+            {
+
+                await JS.InvokeVoidAsync("localStorage.removeItem", "jwt");
+                NavigationManager.NavigateTo("/", forceLoad: true);
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<UserData>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            Data.Email = result?.Email;
+            isLoading = false;
+
+        }
+        catch
+        {
+
+            await JS.InvokeVoidAsync("localStorage.removeItem", "jwt");
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+    }
+
+    private async Task ToggleFavourites()
+    {
+        showFavourites = !showFavourites;
+
+        if (showFavourites)
+        {
+            await FavouritesList(); // Load favourites only when showing
+        }
+    }
+
+    private async Task SendEmail()
+    {
+        try
+        {
+            if (fetched == null || string.IsNullOrWhiteSpace(city))
+            {
+                errorMessage = "⚠️ Weather data not available. Please fetch weather first.";
+                return;
+            }
+
+            // Use already fetched favourites
+            string favouritesString = favList.Count > 0
+                ? string.Join(", ", favList.Select(f => f.City))
+                : "No favourites added";
+
+            // Prepare the forecast array from dailyForecasts
+            var forecastArray = dailyForecasts?.Select(f => new
+            {
+                Date = DateTime.Parse(f.dt_txt).ToString("dddd, dd MMM"),
+                Temp = f.main.temp,
+                Description = f.weather[0].description
+            }).ToList() ?? new();
+
+            // Call JavaScript to send email using the cached values
+            await JS.InvokeVoidAsync(
+                "sendWeatherReport",
+                Data.Email,
+                city,
+                fetched.main.temp,
+                fetched.weather[0].description,
+                fetched.main.humidity,
+                fetched.wind.speed,
+                favouritesString,
+                forecastArray
+            );
+
+            Console.WriteLine("✅ Email sent successfully using cached data.");
+            showConfirmationMessage = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Failed to send email: {ex.Message}");
+            errorMessage = "❌ Failed to send email";
+        }
+    }
+
+
+
+    private string GetWeatherImage(string description)
+    {
+        if (string.IsNullOrEmpty(description)) return "Images/clouds.jpg";
+
+        var desc = description.ToLower();
+        if (desc.Contains("cloud")) return "Images/clouds.png";
+        if (desc.Contains("sun") || desc.Contains("clear")) return "Images/sun.png";
+        if (desc.Contains("thunder") || desc.Contains("storm")) return "Images/thunder.png";
+
+        return "Images/clouds.jpg"; // default fallback
+    }
+
+    // private async Task<IEnumerable<string>> SearchCities(string input, CancellationToken token)
+    // {
+    //     if (string.IsNullOrWhiteSpace(input))
+    //         return new List<string>();
+
+    //     try
+    //     {
+    //         var apiKey = "c06d0be622563127c49524eb461ced09"; Replace with your actual OpenWeatherMap API key
+    //         var url = $"https:api.openweathermap.org/geo/1.0/direct?q={input}&limit=20&appid={apiKey}";
+
+    //         var response = await http.GetAsync(url, token);
+    //         if (!response.IsSuccessStatusCode)
+    //         {
+    //             Console.WriteLine("Failed to fetch city suggestions.");
+    //             return new List<string>();
+    //         }
+
+    //         var json = await response.Content.ReadAsStringAsync();
+    //         var rawList = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
+
+    //         var cityNames = rawList?
+    //             .Where(c => c.ContainsKey("name"))
+    //             .Select(c => c["name"]?.ToString())
+    //             .Distinct()
+    //             .ToList();
+
+    //         return cityNames ?? new List<string>();
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine("Error fetching suggestions: " + ex.Message);
+    //         return new List<string>();
+    //     }
+    // }
+
+    private async Task<IEnumerable<string>> SearchCities(string input, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return new List<string>();
+
+        try
+        {
+            var result = await http.GetFromJsonAsync<List<string>>(
+                $"https://localhost:7155/api/Auth/suggest?query={input}", token);
+
+            return result ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error fetching suggestions: " + ex.Message);
+            return new List<string>();
+        }
+    }
+
+    private async Task GetWeather()
+    {
+        errorMessage = string.Empty;
+        forecasts?.Clear();
+        dailyForecasts?.Clear();
+        fetched = null;
+
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "jwt");
+        http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        try
+        {
+            // 🌤 Forecast API (5-day)
+            var forecastResponse = await http.GetAsync($"https://localhost:7155/api/Auth/forecast?city={city}");
+
+            if (forecastResponse.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                errorMessage = "🔒 Unauthorized: Please log in to view the forecast.";
+                return;
+            }
+
+            if (!forecastResponse.IsSuccessStatusCode)
+            {
+                errorMessage = "❌ Could not fetch forecast data.";
+                return;
+            }
+
+            var forecastJson = await forecastResponse.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<ForecastResponse>(forecastJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            forecasts = result?.list;
+
+            dailyForecasts = forecasts?
+                .Where(f => f.dt_txt.Contains("12:00:00"))
+                .ToList() ?? new List<ForecastItem>();
+
+
+            // 🌡 Current Weather API
+            var weatherResponse = await http.GetAsync($"https://localhost:7155/api/Auth/getWeather/{city}");
+
+            if (weatherResponse.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                errorMessage = "🔒 Unauthorized: Please log in to view current weather.";
+                return;
+            }
+
+            if (!weatherResponse.IsSuccessStatusCode)
+            {
+                errorMessage = "❌ City not found or weather data unavailable.";
+                return;
+            }
+
+            var weatherJson = await weatherResponse.Content.ReadAsStringAsync();
+            fetched = JsonSerializer.Deserialize<WeatherResponse>(weatherJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            isFavourite = await IsCityFavourite(city);
+
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"❌ Network error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"❌ Unexpected error: {ex.Message}";
+        }
+    }
+
+
+    private async Task AddFavourites()
+    {
+        if (isFavourite)
+            return; // Already in favourites, do nothing
+
+        var response = await http.PostAsync($"https://localhost:7155/api/Auth/favourite?city={city}", new StringContent(""));
+
+        if (response.IsSuccessStatusCode)
+        {
+            isFavourite = true;
+            Console.WriteLine("✅ Added to favourites.");
+        }
+        else
+        {
+            Console.WriteLine("❌ Failed to add to favourites.");
+        }
+    }
+
+    private async Task FavouritesList()
+    {
+        errorMessage = null; // clear previous error
+        favList.Clear();     // clear UI before loading
+
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "jwt");
+        http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        try
+        {
+            var response = await http.GetAsync("https://localhost:7155/api/Auth/favourites");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                errorMessage = "🔒 Invalid Token. Login to see favourites.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"❌ Failed to fetch favourites. Status: {response.StatusCode}";
+                return;
+            }
+
+            var favourites = await response.Content.ReadFromJsonAsync<List<string>>();
+
+            foreach (var favcity in favourites)
+            {
+                var weatherResponse = await http.GetAsync($"https://localhost:7155/api/Auth/getweather/{favcity}");
+
+                if (!weatherResponse.IsSuccessStatusCode) continue;
+
+                var json = await weatherResponse.Content.ReadAsStringAsync();
+
+                var fetchedWeather = JsonSerializer.Deserialize<WeatherResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (fetchedWeather?.weather?.Count > 0)
+                {
+                    var weather = new WeatherData
+                    {
+                        City = favcity,
+                        Temperature = fetchedWeather.main.temp,
+                        Description = fetchedWeather.weather[0].description,
+                        Humidity = fetchedWeather.main.humidity,
+                        Longitude = fetchedWeather.coord.lon,
+                        Sunrise = fetchedWeather.sys.sunrise
+                    };
+
+                    favList.Add(weather);
+                }
+            }
+
+            showFavourites = true;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"❌ Network error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"❌ Unexpected error: {ex.Message}";
+        }
+    }
+
+    // private async Task SendWeatherReport()
+    // {
+    //     var response = await http.PostAsync("api/Auth/send-report", null);
+    //     if (response.IsSuccessStatusCode)
+    //     {
+    //         Snackbar.Add("✅ Weather report sent to your email.", Severity.Success);
+    //     }
+    //     else
+    //     {
+    //         Snackbar.Add("❌ Failed to send weather report.", Severity.Error);
+    //     }
+    // }
+
+    // private async Task hideFavourites()
+    // {
+    //     showFavourites = false;
+    // }
+
+    private async Task<bool> IsCityFavourite(string cityName)
+    {
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "jwt");
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        try
+        {
+            var response = await http.GetAsync("https://localhost:7155/api/Auth/favourites");
+
+            if (!response.IsSuccessStatusCode) return false;
+
+            var favouriteCities = await response.Content.ReadFromJsonAsync<List<string>>();
+
+            return favouriteCities?.Contains(cityName, StringComparer.OrdinalIgnoreCase) ?? false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+
+    private async Task Logout()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", "jwt");
+        http.DefaultRequestHeaders.Authorization = null;
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }   
+}
+
+<style>
+    .main-container{
+        display:flex;
+        justify-content:center;
+    }
+    .main-top{
+        display:flex;
+        justify-content:center;
+    }
+</style>

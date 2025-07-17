@@ -1,0 +1,47 @@
+﻿@page "/forecast"
+@using static WeatherFrontend.Models.ForecastModel
+@inject HttpClient Http
+
+<MudText Typo="Typo.h4" Class="mb-4">5-Day Forecast</MudText>
+<MudInput @bind-Value="city"></MudInput>
+<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search" OnClick="GetForecast" Style="background-color:#C5E1A5">
+    Get Weather
+</MudButton>
+
+@if (forecasts == null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="dailyForecasts" Elevation="1" Striped="true" Hover="true">
+        <HeaderContent>
+            <MudTh>Date & Time</MudTh>
+            <MudTh>Temperature (°C)</MudTh>
+            <MudTh>Description</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Date & Time">@DateTime.Parse(context.dt_txt).ToString("dddd, dd MMM")</MudTd>
+            <MudTd DataLabel="Temperature">@context.main.temp</MudTd>
+            <MudTd DataLabel="Description">@context.weather[0].description</MudTd>
+        </RowTemplate>
+    </MudTable>
+
+}
+
+@code {
+    private string city = String.Empty;
+    private List<ForecastItem> forecasts;
+    private List<ForecastItem> dailyForecasts;
+
+    public async Task GetForecast()
+    {
+        var result = await Http.GetFromJsonAsync<ForecastResponse>($"https://localhost:7155/api/weather/forecast?city={city}");
+        forecasts = result?.list;
+
+        // Filter: Get only the 12:00:00 forecasts per day
+        dailyForecasts = forecasts
+            .Where(f => f.dt_txt.Contains("12:00:00"))
+            .ToList();
+    }
+}

@@ -1,0 +1,30 @@
+﻿@page "/confirm"
+@inject NavigationManager Navigation
+
+<h3>🔄 Confirming your email...</h3>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var fragment = uri.Fragment.TrimStart('#'); // everything after the '#'
+        var queryParams = System.Web.HttpUtility.ParseQueryString(fragment);
+
+        var accessToken = queryParams["access_token"];
+        var type = queryParams["type"];
+
+        if (!string.IsNullOrEmpty(accessToken) && type == "signup")
+        {
+            Console.WriteLine("✅ Email confirmed! Token received.");
+            // Optional: store token in localStorage if you want auto-login
+
+            // Redirect to login page
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            Console.WriteLine("❌ Invalid confirmation link.");
+            Navigation.NavigateTo("/"); // fallback redirect
+        }
+    }
+}

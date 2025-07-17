@@ -1,0 +1,169 @@
+﻿@page "/register"
+@using WeatherFrontend.Models
+@inject HttpClient http
+@inject NavigationManager Navigation
+
+
+<MudPaper Class="pa-8 mx-auto" Elevation="24" Style="border-radius:16px; max-width:450px; background: rgba(255,255,255,0.95);">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-1" Style="color:#1e5799; font-weight:600;">Register</MudText>
+
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12">
+            <MudTextField @bind-Value="username"
+                          Label="Username"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Required="true"/>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudTextField @bind-Value="emailid"
+                          Label="Email Id"
+                          Variant="Variant.Outlined"
+                          InputType=InputType.Email
+                          FullWidth="true"
+                          Required="true" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudTextField @bind-Value="password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="@passwordInputType"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@visibilityIcon"
+                          OnAdornmentClick="@handlevisibility"
+                          FullWidth="true" 
+                          Required="true" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudTextField @bind-Value="confirmpassword"
+                          Label="Confirm Password"
+                          Variant="Variant.Outlined"
+                          InputType="@passwordInputType1"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@visibilityIcon1"
+                          OnAdornmentClick="@handlevisibility1"
+                          FullWidth="true" 
+                          Required="true" />
+        </MudItem>
+
+        <MudItem xs="12" Class="d-flex justify-center">
+            <MudText Color="Color.Error">@message</MudText>
+        </MudItem>
+        
+
+        <MudItem xs="12" Class="d-flex justify-center mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RegisterUser" >Register</MudButton>
+        </MudItem>
+
+        @if (showConfirmationMessage)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Filled" Class="mt-3">
+                ✅ Registration successful. Please check your email to confirm your account.
+            </MudAlert>
+        }
+
+    </MudGrid>
+</MudPaper>
+
+@code {
+    private string username = string.Empty;
+    private string emailid = string.Empty;
+    private string password = string.Empty;
+    private string confirmpassword = string.Empty;
+    private string message = "";
+    private bool showConfirmationMessage = false;
+
+
+    private InputType passwordInputType = InputType.Password;
+    private InputType passwordInputType1 = InputType.Password;
+    private string visibilityIcon = Icons.Material.Filled.VisibilityOff;
+    private string visibilityIcon1 = Icons.Material.Filled.VisibilityOff;
+
+    public RegisterData data = new RegisterData();
+
+    private async Task handlevisibility()
+    {
+        if(passwordInputType==InputType.Password)
+        {
+            passwordInputType = InputType.Text;
+            visibilityIcon = Icons.Material.Filled.Visibility;
+        }
+        else
+        {
+            passwordInputType = InputType.Password;
+            visibilityIcon = Icons.Material.Filled.VisibilityOff;
+        }
+    }
+
+    private async Task handlevisibility1()
+    {
+        if (passwordInputType1 == InputType.Password)
+        {
+            passwordInputType1 = InputType.Text;
+            visibilityIcon1 = Icons.Material.Filled.Visibility;
+        }
+        else
+        {
+            passwordInputType1 = InputType.Password;
+            visibilityIcon1 = Icons.Material.Filled.VisibilityOff;
+        }
+    }
+
+    private async Task RegisterUser()
+    {
+        showConfirmationMessage = false;
+        if (password != confirmpassword)
+        {
+            message = "Password doesn't match";
+            return;
+        }
+
+        var signUpPayload = new
+        {
+            email = emailid,
+            password = password
+        };
+
+        try
+        {
+            var response = await http.PostAsJsonAsync("https://localhost:7155/api/auth/supabase-signup", signUpPayload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = "✅ Registration successful!";
+
+                // Prepare user data to store in MongoDB
+                data = new RegisterData
+                {
+                    UserName = username,
+                    Email = emailid,
+                    Password = password,
+                    ConfirmPassword = confirmpassword
+                };
+
+                // Save user to MongoDB
+                await http.PostAsJsonAsync($"https://localhost:7155/api/Auth/register",data);
+
+                // Redirect to home
+                // Navigation.NavigateTo("/");
+
+                showConfirmationMessage = true;
+                Console.WriteLine("✅ Registration complete. Please confirm your email.");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                message = $"❌ Failed to register via Supabase: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"🚨 Unexpected error: {ex.Message}";
+        }
+    }
+
+}
